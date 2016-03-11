@@ -336,88 +336,10 @@ bool handleSubSolid( const TopoDS_Shape& aShape, DATA& data, SGNODE* parent )
         std::string locID = ostr.str();
 
         if( shape.ShapeType() == TopAbs_FACE && processFace( TopoDS::Face( shape ),
-                                                             data, lcolor, locID, parent ) )
+            data, lcolor, locID, parent ) )
         {
             ++subFace;
             ret = true;
-        }
-    }
-
-    return ret;
-}
-
-
-bool inspect( DATA& data, TopoDS_Shape& shape, int id, SGNODE* parent );
-
-bool handleSolid( TDF_Label& aLabel, DATA& data, SGNODE* parent )
-{
-    std::string id;
-    getTag( aLabel, id );
-
-    bool ret = false;
-    TopoDS_Shape aShape;
-    data.m_assy->GetShape( aLabel, aShape );
-
-    if( data.m_assy->IsTopLevel( aLabel ) )
-    {
-        TopExp_Explorer tree( aShape, TopAbs_SOLID );
-
-        for(; tree.More(); tree.Next() )
-        {
-            const TopoDS_Shape& shape = tree.Current();
-            TDF_Label label;
-
-            if( !data.m_assy->FindShape( shape, label ) )
-                continue;
-
-            if( handleSubSolid( shape, data, parent ) )
-                ret = true;
-        }
-    }
-    else
-    {
-        TopExp_Explorer tree( data.m_assy->GetShape( aLabel ), TopAbs_FACE );
-        bool hasColor;
-        Quantity_Color col;
-        Quantity_Color* lcolor = NULL;
-        int subFace = 0;
-        hasColor = getColor( data, aLabel, col );
-
-        if( hasColor )
-            lcolor = &col;
-
-        for(; tree.More(); tree.Next() )
-        {
-            const TopoDS_Shape& shape = tree.Current();
-            std::ostringstream ostr;
-            ostr << id << "-" << subFace;
-            std::string locID = ostr.str();
-
-            if( shape.ShapeType() == TopAbs_FACE && processFace( TopoDS::Face( shape ),
-                                                                 data, lcolor, locID, parent ) )
-            {
-                ++subFace;
-                ret = true;
-            }
-        }
-    }
-
-    if( aLabel.HasChild() )
-    {
-        TDF_ChildIterator it;
-        int sid = 0;
-
-        for( it.Initialize( aLabel ); it.More(); it.Next() )
-        {
-            TopoDS_Shape subShape;
-
-            if( !data.m_assy->GetShape( it.Value(), subShape ) )
-                continue;
-
-            if( inspect( data, subShape, sid, parent ) )
-                ret = true;
-
-            ++sid;
         }
     }
 
@@ -432,123 +354,69 @@ bool inspect( DATA& data, TopoDS_Shape& shape, int id, SGNODE* parent )
     if( aLabel.IsNull() )
         return false;
 
-    std::string ltag;
-    getTag( aLabel, ltag );
-
-    TDF_LabelSequence subs;
-    Standard_Boolean hassubs = data.m_assy->GetSubShapes( aLabel, subs );
-
-    Quantity_Color col;
-    bool hasColor = getColor( data, aLabel, col );
-    TopAbs_ShapeEnum stype = shape.ShapeType();
-    TopLoc_Location loc = shape.Location();
-    gp_Trsf T = loc.Transformation();
-    gp_XYZ coord = T.TranslationPart();
     bool ret = false;
 
-    if( hassubs )
+    if( aLabel.HasChild() )
     {
+        std::string partID;
+        getTag( aLabel, partID );
+        TopLoc_Location loc = shape.Location();
+        gp_Trsf T = loc.Transformation();
+        gp_XYZ coord = T.TranslationPart();
         IFSG_TRANSFORM childNode( parent );
+        childNode.SetTranslation( SGPOINT( coord.X(), coord.Y(), coord.Z() ) );
 
         if( gp_Identity != T.Form() )
         {
+            // data must be transformed
             gp_XYZ axis;
             Standard_Real angle;
 
             if( T.GetRotation( axis, angle ) )
                 childNode.SetRotation( SGVECTOR( axis.X(), axis.Y(), axis.Z() ), angle );
-
-            childNode.SetTranslation( SGPOINT( coord.X(), coord.Y(), coord.Z() ) );
         }
 
-        // process sub shapes
-        int nsub = subs.Length();
-        int sid = 1;
+        SGNODE* shapeRef = data.GetShape( partID );
 
-        while( sid <= nsub )
+        if( NULL != shapeRef )
         {
-            TopoDS_Shape sshape = data.m_assy->GetShape( subs.Value(sid) );
+            S3D::AddSGNodeRef( childNode.GetRawPtr(), shapeRef );
+            return true;
+        }
 
-            if ( sshape.IsNull() )
-            {
-                ++sid;
+        IFSG_TRANSFORM subNode( childNode.GetRawPtr() );
+
+        TDF_ChildIterator it;
+        int sid = 0;
+
+        for( it.Initialize( aLabel ); it.More(); it.Next() )
+        {
+            TopoDS_Shape subShape;
+
+            if( !data.m_assy->GetShape( it.Value(), subShape ) )
                 continue;
-            }
 
-            if( inspect( data, sshape, sid, childNode.GetRawPtr() ) )
+            if( inspect( data, subShape, sid, subNode.GetRawPtr() ) )
                 ret = true;
 
             ++sid;
-        };
+        }
 
         if( ret )
         {
-            S3D::AddSGNodeChild( parent, childNode.GetRawPtr() );
-            ret = true;
+            S3D::AddSGNodeChild( childNode.GetRawPtr(), subNode.GetRawPtr() );
+            data.shapes.insert( std::pair< std::string, SGNODE* >( partID, subNode.GetRawPtr() ) );
         }
         else
         {
+            subNode.Destroy();
             childNode.Destroy();
         }
-
     }
     else
     {
-        switch( stype )
-        {
-            case TopAbs_FACE:
-                do
-                {
-                    Quantity_Color* cp = NULL;
-
-                    if( hasColor )
-                        cp = &col;
-
-                    if( processFace( TopoDS::Face( shape ), data, cp, ltag, parent ) )
-                        ret = true;
-
-                } while(0);
-
-                break;
-
-            case TopAbs_COMPSOLID:
-            case TopAbs_COMPOUND:
-            case TopAbs_SOLID:
-                do
-                {
-                    IFSG_TRANSFORM childNode( parent );
-
-                    childNode.SetTranslation( SGPOINT( coord.X(), coord.Y(), coord.Z() ) );
-
-                    if( gp_Identity != T.Form() )
-                    {
-                        // data must be transformed
-                        gp_XYZ axis;
-                        Standard_Real angle;
-
-                        if( T.GetRotation( axis, angle ) )
-                            childNode.SetRotation( SGVECTOR( axis.X(), axis.Y(), axis.Z() ),
-                                                   angle );
-                    }
-
-                    if( handleSolid( aLabel, data, childNode.GetRawPtr() ) )
-                    {
-                        S3D::AddSGNodeChild( parent, childNode.GetRawPtr() );
-                        ret = true;
-                    }
-                    else
-                    {
-                        childNode.Destroy();
-                    }
-
-                } while( 0 );
-
-                break;
-
-            default:
-                break;
-        }
-
+        if( handleSubSolid( shape, data, parent ) )
+            ret = true;
     }
 
     return ret;
