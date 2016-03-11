@@ -151,9 +151,15 @@ if( NOT APPLE )
     if( WIN32 )
         set( KICAD_LIB ${KICAD_BIN}
             CACHE PATH "Location of KiCad shared objects" )
+
+        set( KICAD_USER_PLUGIN ${KICAD_BIN}/plugins
+                CACHE PATH "Location of KiCad user-loaded plugins" )
     else()
         set( KICAD_LIB ${CMAKE_INSTALL_PREFIX}/lib
             CACHE PATH "Location of KiCad shared objects" )
+
+        set( KICAD_USER_PLUGIN ${CMAKE_INSTALL_PREFIX}/lib/kicad/plugins
+                CACHE PATH "Location of KiCad user-loaded plugins" )
     endif()
 
 else()
