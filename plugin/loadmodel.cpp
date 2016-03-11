@@ -102,6 +102,8 @@ struct DATA
 
     ~DATA()
     {
+        m_doc->Close();
+
         // destroy any shapes with no parent
         if( !shapes.empty() )
         {
@@ -345,6 +347,8 @@ bool handleSubSolid( const TopoDS_Shape& aShape, DATA& data, SGNODE* parent )
 }
 
 
+bool inspect( DATA& data, TopoDS_Shape& shape, int id, SGNODE* parent );
+
 bool handleSolid( TDF_Label& aLabel, DATA& data, SGNODE* parent )
 {
     std::string id;
@@ -395,6 +399,25 @@ bool handleSolid( TDF_Label& aLabel, DATA& data, SGNODE* parent )
                 ++subFace;
                 ret = true;
             }
+        }
+    }
+
+    if( aLabel.HasChild() )
+    {
+        TDF_ChildIterator it;
+        int sid = 0;
+
+        for( it.Initialize( aLabel ); it.More(); it.Next() )
+        {
+            TopoDS_Shape subShape;
+
+            if( !data.m_assy->GetShape( it.Value(), subShape ) )
+                continue;
+
+            if( inspect( data, subShape, sid, parent ) )
+                ret = true;
+
+            ++sid;
         }
     }
 
@@ -555,10 +578,7 @@ bool readIGES( Handle(TDocStd_Document)& m_doc, const char* fname )
     reader.SetLayerMode(false); // ignore LAYER data
 
     if ( !reader.Transfer( m_doc ) )
-    {
-        m_doc->Close();
         return false;
-    }
 
     // are there any shapes to translate?
     if( reader.NbShapes() < 1 )
