@@ -122,10 +122,7 @@ struct DATA
             while( sC != eC )
             {
                 if( NULL == S3D::GetSGNodeParent( sC->second ) )
-                {
-                    std::cout << "(destroy " << sC->second << ")\n";
                     S3D::DestroyNode( sC->second );
-                }
 
                 ++sC;
             }
@@ -134,7 +131,7 @@ struct DATA
         }
 
         if( defaultColor && NULL == S3D::GetSGNodeParent( defaultColor ) )
-            S3D::DestroyNode( defaultColor );
+            S3D::DestroyNode(defaultColor);
 
         // destroy any faces with no parent
         if( !faces.empty() )
@@ -145,10 +142,7 @@ struct DATA
             while( sF != eF )
             {
                 if( NULL == S3D::GetSGNodeParent( sF->second ) )
-                {
-                    std::cout << "(destroy " << sF->second << ")\n";
                     S3D::DestroyNode( sF->second );
-                }
 
                 ++sF;
             }
@@ -183,8 +177,9 @@ struct DATA
         }
 
         if( scene )
-            S3D::DestroyNode( scene );
+            S3D::DestroyNode(scene);
 
+        return;
     }
 
     // find collection of tagged nodes
@@ -508,7 +503,6 @@ bool processCompound( DATA& data, const TopoDS_Shape& shape,
     {
         const TopoDS_Shape& subShape = tree.Current();
 
-        // XXX - do we have a color?
         if( processShell( data, subShape, NULL, pptr, items ) )
             ret = true;
     }
@@ -519,7 +513,6 @@ bool processCompound( DATA& data, const TopoDS_Shape& shape,
     {
         const TopoDS_Shape& subShape = tree.Current();
 
-        // XXX - do we have a color?
         if( processFace( TopoDS::Face( subShape ), data, NULL, "", pptr, items ) )
             ret = true;
     }
@@ -675,6 +668,10 @@ bool inspect( DATA& data, const TopoDS_Shape& shape, SGNODE* parent,
                     items->insert(items->end(), itemList.begin(), itemList.end() );
             }
         }
+    }
+    else if( hasTx )
+    {
+        S3D::DestroyNode( pptr );
     }
 
     return ret;
@@ -846,7 +843,7 @@ bool processFace( const TopoDS_Face& face, DATA& data, Quantity_Color* color,
     SGNODE* ashape = NULL;
 
     if( !id.empty() )
-        data.GetFace( id );
+        ashape = data.GetFace( id );
 
     if( ashape )
     {
@@ -860,7 +857,8 @@ bool processFace( const TopoDS_Face& face, DATA& data, Quantity_Color* color,
 
         if( data.renderBoth )
         {
-            std::string id2 = id + "b";
+            std::string id2 = id;
+            id2.append( "b" );
             SGNODE* shapeB = data.GetFace( id2 );
 
             if( NULL == S3D::GetSGNodeParent( shapeB ) )
@@ -984,7 +982,8 @@ bool processFace( const TopoDS_Face& face, DATA& data, Quantity_Color* color,
     // we must render both sides of a surface.
     if( data.renderBoth )
     {
-        std::string id2 = id + "b";
+        std::string id2 = id;
+        id2.append( "b" );
         IFSG_SHAPE vshape2( true );
         IFSG_FACESET vface2( vshape2 );
         IFSG_COORDS vcoords2( vface2 );
@@ -1000,7 +999,6 @@ bool processFace( const TopoDS_Face& face, DATA& data, Quantity_Color* color,
             data.faces.insert( std::pair< std::string,
                 SGNODE* >( id2, vshape2.GetRawPtr() ) );
     }
-
 
     return true;
 }
