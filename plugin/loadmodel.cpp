@@ -28,6 +28,11 @@
 #include <cstring>
 #include <map>
 
+#if ( defined( DEBUG_OCE ) && DEBUG_OCE > 3 )
+#include <wx/filename.h>
+#include <wx/string.h>
+#endif
+
 #include <TDocStd_Document.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
@@ -750,8 +755,9 @@ SCENEGRAPH* LoadModel( char const* filename )
 
     Handle(XCAFApp_Application) m_app = XCAFApp_Application::GetApplication();
     m_app->NewDocument( "MDTV-XCAF", data.m_doc );
+    FormatType modelFmt = fileType( filename );
 
-    switch( fileType( filename ) )
+    switch( modelFmt )
     {
         case FMT_IGES:
             data.renderBoth = true;
@@ -813,7 +819,7 @@ SCENEGRAPH* LoadModel( char const* filename )
         wxFileName fn( wxString::FromUTF8Unchecked( filename ) );
         wxString output;
 
-        if( fileType == FMT_STEP )
+        if( FMT_STEP == modelFmt )
             output = wxT( "_step-" );
         else
             output = wxT( "_iges-" );
@@ -889,7 +895,7 @@ bool processFace( const TopoDS_Face& face, DATA& data, Quantity_Color* color,
     Quantity_Color lcolor;
 
     // if the shape is not assigned a color, check if the face has a color
-    if( NULL == color )
+    do
     {
         TDF_Label L;
 
@@ -900,7 +906,7 @@ bool processFace( const TopoDS_Face& face, DATA& data, Quantity_Color* color,
                 || data.m_color->GetColor(L, XCAFDoc_ColorSurf, lcolor ) )
                 color = &lcolor;
         }
-    }
+    } while( 0 );
 
     SGNODE* ocolor = data.GetColor( color );
 
