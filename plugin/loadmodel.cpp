@@ -641,8 +641,16 @@ bool inspect( DATA& data, const TopoDS_Shape& shape, SGNODE* parent,
         if( !data.m_assy->GetShape( it.Value(), subShape ) )
             continue;
 
-        if( inspect( data, subShape, pptr, &itemList ) )
-            ret = true;
+        if( TopAbs_SOLID == subShape.ShapeType() )
+        {
+            if( processSolid( data, subShape, pptr, &itemList ) )
+                ret = true;
+        }
+        else
+        {
+            if( inspect( data, subShape, pptr, &itemList ) )
+                ret = true;
+        }
     }
 
     if( ret )
@@ -767,8 +775,6 @@ SCENEGRAPH* LoadModel( char const* filename )
 
     // retrieve all shapes at this level
     TDF_LabelSequence frshapes;
-    // Note: GetShapes appears to repeat everything, so use GetFreeShapes
-    //data.m_assy->GetShapes(frshapes);
     data.m_assy->GetFreeShapes( frshapes );
 
     int nshapes = frshapes.Length();
