@@ -177,7 +177,7 @@ void SGNORMALS::SetNormalList( size_t aListSize, const SGVECTOR* aNormalList )
     if( 0 == aListSize || NULL == aNormalList )
         return;
 
-    for( int i = 0; i < aListSize; ++i )
+    for( int i = 0; i < (int)aListSize; ++i )
         norms.push_back( aNormalList[i] );
 
     return;
@@ -285,7 +285,13 @@ bool SGNORMALS::WriteCache( std::ofstream& aFile, SGNODE* parentNode )
         while( NULL != np->GetParent() )
             np = np->GetParent();
 
-        return np->WriteCache( aFile, NULL );
+        if( np->WriteCache( aFile, NULL ) )
+        {
+            m_written = true;
+            return true;
+        }
+
+        return false;
     }
 
     if( parentNode != m_Parent )
@@ -322,6 +328,7 @@ bool SGNORMALS::WriteCache( std::ofstream& aFile, SGNODE* parentNode )
     if( aFile.fail() )
         return false;
 
+    m_written = true;
     return true;
 }
 

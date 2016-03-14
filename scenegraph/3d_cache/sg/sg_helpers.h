@@ -84,17 +84,25 @@ class SGCOORDINDEX;
                 oSL = &aOwnedList; \
                 sL =  aOwnedList.begin(); \
                 eL =  aOwnedList.end(); \
+                while( sL != eL ) { \
+                    if( (SGNODE*)*sL == aNode ) { \
+                        oSL->erase( sL ); \
+                        return; \
+                    } \
+                    ++sL; \
+                } \
             } else { \
                 oSL = &aRefList; \
                 sL =  aRefList.begin(); \
                 eL =  aRefList.end(); \
-            } \
-            while( sL != eL ) { \
-                if( (SGNODE*)*sL == aNode ) { \
-                    oSL->erase( sL ); \
-                    return; \
+                while( sL != eL ) { \
+                    if( (SGNODE*)*sL == aNode ) { \
+                        delNodeRef( this ); \
+                        oSL->erase( sL ); \
+                        return; \
+                    } \
+                    ++sL; \
                 } \
-                ++sL; \
             } \
             return; \
         } } while( 0 )
@@ -105,7 +113,6 @@ class SGCOORDINDEX;
 #define ADD_NODE( aNodeID, aType, aNode, aOwnedList, aRefList, isChild ) do { \
     if( aNodeID == aNode->GetNodeType() ) { \
         std::vector< aType* >::iterator sL; \
-        SGNODE* psg = NULL; \
         sL = std::find( aOwnedList.begin(), aOwnedList.end(), aNode ); \
         if( sL != aOwnedList.end() ) return true; \
         sL = std::find( aRefList.begin(), aRefList.end(), aNode ); \
