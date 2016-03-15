@@ -280,8 +280,8 @@ set( LIBS_OCE PTKernel TKBin TKBinL TKBinXCAF TKBO
     TKSTL TKTopAlgo TKV3d TKVRML TKXCAF TKXCAFSchema TKXDEIGES
     TKXDESTEP TKXml TKXmlL TKXmlXCAF TKXSBase TKernel )
 
-find_package( OCE 0.16 REQUIRED ${LIBS_OCE} )
-
+#find_package( OCE 0.16 REQUIRED ${LIBS_OCE} )
+find_package( OpenCasCade )
 # Include MinGW resource compiler.
 include( MinGWResourceCompiler )
 
