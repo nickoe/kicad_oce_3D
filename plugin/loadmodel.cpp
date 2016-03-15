@@ -78,12 +78,13 @@
 // log mask for wxLogTrace
 #define MASK_OCE "PLUGIN_OCE"
 
-// precision for mesh creation; this should be good enough for ECAD viewing
-#define USER_PREC (0.07)
+// precision for mesh creation; 0.07 should be good enough for ECAD viewing
+#define USER_PREC (0.14)
 // angular deflection for meshing
 // 10 deg (36 faces per circle) = 0.17453293
 // 20 deg (18 faces per circle) = 0.34906585
-#define USER_ANGLE (0.34906585)
+// 30 deg (12 faces per circle) = 0.52359878
+#define USER_ANGLE (0.52359878)
 
 typedef std::map< Standard_Real, SGNODE* > COLORMAP;
 typedef std::map< std::string, SGNODE* >   FACEMAP;
@@ -112,7 +113,8 @@ struct DATA
     NODEMAP  shapes;    // SGNODE lists representing a TopoDS_SOLID / COMPOUND
     COLORMAP colors;    // SGAPPEARANCE nodes
     FACEMAP  faces;     // SGSHAPE items representing a TopoDS_FACE
-    bool renderBoth;
+    bool renderBoth;    // set TRUE if we're processing IGES
+    bool hasSolid;      // set TRUE if there is no parent SOLID
 
     DATA()
     {
@@ -120,6 +122,7 @@ struct DATA
         defaultColor = NULL;
         refColor.SetValues( Quantity_NOC_BLACK );
         renderBoth = false;
+        hasSolid = false;
     }
 
     ~DATA()
@@ -564,6 +567,7 @@ bool processSolid( const TopoDS_Shape& shape, DATA& data, SGNODE* parent,
     if( label.IsNull() )
         return false;
 
+    data.hasSolid = true;
     std::string partID;
     getTag( label, partID );
 
@@ -654,6 +658,7 @@ bool processComp( const TopoDS_Shape& shape, DATA& data, SGNODE* parent,
     {
         const TopoDS_Shape& subShape = it.Value();
         TopAbs_ShapeEnum stype = subShape.ShapeType();
+        data.hasSolid = false;
 
         switch( stype )
         {
@@ -697,6 +702,7 @@ bool processNode( const TopoDS_Shape& shape, DATA& data, SGNODE* parent,
 {
     TopAbs_ShapeEnum stype = shape.ShapeType();
     bool ret = false;
+    data.hasSolid = false;
 
     switch( stype )
     {
@@ -735,9 +741,17 @@ bool processFace( const TopoDS_Face& face, DATA& data, SGNODE* parent,
     if( Standard_True == face.IsNull() )
         return false;
 
+    bool reverse = ( face.Orientation() == TopAbs_REVERSED );
     SGNODE* ashape = NULL;
     std::string partID;
     TDF_Label label;
+
+    bool useBothSides = false;
+
+    // for IGES renderBoth = TRUE; for STEP if a shell or face is not a descendant
+    // of a SOLID then hasSolid = false and we must render both sides
+    if( data.renderBoth || !data.hasSolid )
+        useBothSides = true;
 
     if( data.m_assy->FindShape( face, label, Standard_False ) )
         getTag( label, partID );
@@ -755,7 +769,7 @@ bool processFace( const TopoDS_Face& face, DATA& data, SGNODE* parent,
         if( NULL != items )
             items->push_back( ashape );
 
-        if( data.renderBoth )
+        if( useBothSides )
         {
             std::string id2 = partID;
             id2.append( "b" );
@@ -773,7 +787,7 @@ bool processFace( const TopoDS_Face& face, DATA& data, SGNODE* parent,
         return true;
     }
 
-    TopLoc_Location loc = face.Location();
+    TopLoc_Location loc;
     Standard_Boolean isTessellate (Standard_False);
     Handle(Poly_Triangulation) triangulation = BRep_Tool::Triangulation( face, loc );
 
@@ -799,8 +813,8 @@ bool processFace( const TopoDS_Face& face, DATA& data, SGNODE* parent,
         if( data.m_color->ShapeTool()->Search( face, L ) )
         {
             if( data.m_color->GetColor( L, XCAFDoc_ColorGen, lcolor )
-                || data.m_color->GetColor(L, XCAFDoc_ColorCurv, lcolor )
-                || data.m_color->GetColor(L, XCAFDoc_ColorSurf, lcolor ) )
+                || data.m_color->GetColor( L, XCAFDoc_ColorCurv, lcolor )
+                || data.m_color->GetColor( L, XCAFDoc_ColorSurf, lcolor ) )
                 color = &lcolor;
         }
     } while( 0 );
@@ -821,7 +835,6 @@ bool processFace( const TopoDS_Face& face, DATA& data, SGNODE* parent,
 
     const TColgp_Array1OfPnt&    arrPolyNodes = triangulation->Nodes();
     const Poly_Array1OfTriangle& arrTriangles = triangulation->Triangles();
-    Standard_Boolean isReverse = (face.Orientation() == TopAbs_REVERSED);
 
     std::vector< SGPOINT > vertices;
     std::vector< int > indices;
@@ -840,7 +853,7 @@ bool processFace( const TopoDS_Face& face, DATA& data, SGNODE* parent,
         arrTriangles( i ).Get( a, b, c );
         a--;
 
-        if(isReverse)
+        if( reverse )
         {
             int tmp = b - 1;
             b = c - 1;
@@ -854,7 +867,7 @@ bool processFace( const TopoDS_Face& face, DATA& data, SGNODE* parent,
         indices.push_back( b );
         indices.push_back( c );
 
-        if( data.renderBoth )
+        if( useBothSides )
         {
             indices2.push_back( b );
             indices2.push_back( a );
@@ -873,7 +886,7 @@ bool processFace( const TopoDS_Face& face, DATA& data, SGNODE* parent,
 
     // The outer surface of an IGES model is indeterminate so
     // we must render both sides of a surface.
-    if( data.renderBoth )
+    if( useBothSides )
     {
         std::string id2 = partID;
         id2.append( "b" );
