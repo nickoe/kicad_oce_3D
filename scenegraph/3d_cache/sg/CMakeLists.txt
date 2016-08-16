@@ -1,6 +1,7 @@
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/3d-viewer
+    ${GLM_INCLUDE_DIR}
   )
 
 add_library( kicad_3dsg SHARED
