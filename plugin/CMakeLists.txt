@@ -1,4 +1,8 @@
-include_directories( ${OCE_INCLUDE_DIRS} )
+include_directories(
+    ${OCE_INCLUDE_DIRS}
+    ${GLM_INCLUDE_DIR}
+    )
+
 add_library( s3d_plugin_oce MODULE oce.cpp loadmodel.cpp )
 target_link_libraries( s3d_plugin_oce kicad_3dsg ${LIBS_OCE} ${wxWidgets_LIBRARIES} )
 
